@@ -27,13 +27,13 @@ def ArgsParser(argv):
 
 	try:
 		opts, args = getopt.getopt(argv, "hf:o:m:", ["help", "blast=", "output=", "mapping="]) 
-#表示参数选项有：-h, -f, -o, --help, --fasta, --output，它们相互对应；该方法的返回值有两个元素: 第一个是(opt, value)元组的列表，第二个是一般参数列表，包含那些没有 '-' 或 '--' 的参数
+#-h, -f, -o, --help, --fasta, --output
 	except getopt.GetoptError:
 		print(USAGE)
 		print('Error: invalid arguments')
 		sys.exit(2)
 
-	for opt, arg in opts:  #依次获取列表中的元组项
+	for opt, arg in opts:
 		if opt in ("-h", "--help"):
 			print(USAGE)
 			sys.exit(1)
@@ -44,8 +44,8 @@ def ArgsParser(argv):
 		elif opt in ("-m", "--mapping"):
 			outMapping = arg
 	print('-----------------------------------------------------------------------')
-	print(opts) #元组构成的列表
-	print(args) #args指的是不用 '-'或 '--'传递的参数，这里没有传递，所以为空
+	print(opts)
+	print(args)
 	print('Input Fasta: ', fasta_file)
 	print('Mapping file: ', outMapping)
 	print('Ouput', output)
@@ -91,7 +91,7 @@ if __name__ == '__main__':
 				continue
 		if temp:
 			for indgo in temp:
-				
+				indgo=indgo.strip()
 			OUT.write(i + "\t" +  ",".join(set(temp)) + "\n")
 
 	OUT.close()
