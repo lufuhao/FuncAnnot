@@ -16,9 +16,11 @@ It can collect data from Eggnog-mapper of custom BLAST. But you may need to tran
 ## Requirements
 
   Perl modules:
-  JSON, Getopt::Long, [FuhaoPerl5Lib](https://github.com/lufuhao/FuhaoPerl5Lib)
+    JSON, Getopt::Long, [FuhaoPerl5Lib](https://github.com/lufuhao/FuhaoPerl5Lib)
   
-  R packages: AnnotationForge, ClusterProfiler
+  R packages: 
+    optparse, dplyr, stringr, 
+    AnnotationForge, ClusterProfiler, DBI, GO.db, RSQLite
 
   Python
 
@@ -92,6 +94,8 @@ uniport2go.py -f res.blast.tab -m idmapping.tb.gz -o blast2go.tab
 ### 2. Data transform for AnnotationForge
 
 ```
+cd $runningdir
+
 funcannot.1.data.pl \
  -i 0.eggnog/HC001.annotations \
  -i 0.eggnog/HC002.annotations \
@@ -109,20 +113,28 @@ funcannot.1.data.pl \
  --gos 0.diamond/gene_go/LC02.gene2go \
  --gos 0.diamond/gene_go/LC03.gene2go \
  --gos 0.diamond/gene_go/stringtie.new.gene2go \
- --ignorego 0 --rmgotsnum
+ --ignorego 0 --rmgotsnum -p MyDB
 ```
+
 
 ### 3. make custom OrgDB using R AnnotationForge
 
-- [] to be done
+Do some research before running
+* Go [NCBI](https://www.ncbi.nlm.nih.gov/taxonomy) and find your taxID, forexample, "4565" for Triticum aestivum
+* Find the genus name: "Triticum"
+* find and species name: "aestivum"
+* define a version name: "\d+.\d+", otherwise version error would be reported
+
 
 ```
-not availble now
+cd $runningdir
+
+funcannot.2.makeOrgDB.rscript -p MyDB -d . -
 ```
 
 ### 4. Given a gene list, do the enrichment of GO/KO using clusterProfiler
 
-- [] to be done
+- [ ] to be done
 
 ```
 not availble now
