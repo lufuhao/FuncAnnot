@@ -124,12 +124,13 @@ Do some research before running
 * Find the genus name: "Triticum"
 * find and species name: "aestivum"
 * define a version name: "\d+.\d+", otherwise version error would be reported
-
+* Use the same prefix as Step2, for instance: **MyDB**
+* It takes time to load all the data to DB depending on your data size, so pay patience ...
 
 ```
 cd $runningdir
 
-funcannot.2.makeOrgDB.rscript -p MyDB -d . -
+funcannot.2.makeOrgDB.rscript --prefix MyOut --genus Triticum --species aestivum --taxid 4565 --vers 2021.0128
 ```
 
 ### 4. Given a gene list, do the enrichment of GO/KO using clusterProfiler

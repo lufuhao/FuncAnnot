@@ -1,0 +1,215 @@
+#!/usr/bin/env Rscript
+
+
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+packages.required <- c("optparse", "AnnotationForge", "dplyr", "stringr", "RSQLite", "DBI", "GO.db")
+
+
+if (! requireNamespace("BiocManager", quietly = T))
+        install.packages("BiocManager")
+invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
+packages.absense <- setdiff(packages.required, rownames(installed.packages()))
+if (length(packages.absense) > 0) {
+	install.packages(packages.absense)
+}
+invisible(lapply(packages.required, function(x) require(x, character.only = T, quietly = T, warn.conflicts = FALSE)))
+
+
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-d", "--outdir"), type="character", default=".", 
+              action = "store", help="Output path [default= %default]", metavar="STR"),
+    make_option(c("-p", "--prefix"), type="character", default="MyOut", 
+              action = "store", help="Output File prefix [default= %default]", metavar="PREFIX"),
+    make_option(c("-g", "--genus"), type="character", default="Triticum", 
+              action = "store", help="Genus name [default= %default]", metavar="STR"),
+    make_option(c("-s", "--species"), type="character", default="aestivum", 
+              action = "store", help="Species name [default= %default]", metavar="STR"),
+    make_option(c("-x", "--taxid"), type="character", default="4565", 
+              action = "store", help="Taxonomy ID [default= %default]", metavar="Int"),
+    make_option(c("-v", "--vers"), type="character", default="0.1", 
+              action = "store", help="Org DB version number [default= %default]", metavar="[0-9].[0-9]"),
+    make_option(c("--verbose"), type="logical", default=FALSE, 
+              action = "store_true", help="Print detailed info [default= %default]", metavar=NULL)
+  );
+
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!\nFor example:\nfuncannot.2.makeOrgDB.rscript --prefix MyOut --genus Triticum --species aestivum --taxid 4565 --vers 2021.0128\n\n###Prefix.gene_info.tab\nGID	GENENAME\nTraesCS1A02G000100.1	4572.TRIUR3_00132-P1\nTraesCS1A02G000200.1	4572.TRIUR3_00007-P1\nTraesCS1A02G000300.1	4572.TRIUR3_00007-P1\n\n###Prefix.gene2go.tab\nGID	GO	EVIDENCE\nTraesCS1A02G001800.1	GO:0003674	IEA\nTraesCS1A02G001800.1	GO:0003735	IEA\nTraesCS1A02G001800.1	GO:0005198	IEA\n\nPrefixOutPfx.gene2ko.tab\nGID	KO\nTraesCS1A02G001800.1	K02902\nTraesCS1A02G001900.1	K13343\nTraesCS1A02G001900.1	K16284\n\nPrefixOutPfx.gene2pathway.tab\nGID	Pathway\nTraesCS1A02G001800.1	ko03010\nTraesCS1A02G001800.1	ko03011\nTraesCS1A02G001900.1	ko04146\n\n")
+
+opt = parse_args(opt_parser)
+
+if (is.null(opt$prefix)){
+	print_help(opt_parser)
+	stop('Error: invalid prefix file', call.=FALSE)
+}
+
+
+################# input and output #########################
+
+print (paste0("Output Dir: ", opt$outdir))
+print (paste0("Output prefix: ", opt$prefix))
+
+
+
+out_dir=opt$outdir
+orgDbVersion=opt$vers
+orgDbTaxid=opt$taxid
+orgDbGenus = opt$genus
+orgDbSpecies = opt$species
+
+
+### Input output
+if (! file_test("-d", out_dir)) {
+	dir.create(out_dir, showWarnings = TRUE, recursive=T, mode = "0755")
+}
+setwd(out_dir)
+
+makeOrgPackageFromEmapper <- function(outPfx, 
+                                      version="v1",
+                                      tax_id = "0",
+                                      genus = "default",
+                                      species = "default") {
+
+	### STEP1: gene_info
+	print (paste0("### Step1: gene_info"))
+	oPfx=paste0(outPfx, ".gene_info")
+	gene_info<-data.frame(GID = character(), GENENAME = character())
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene_info<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "GENENAME"))
+		gene_info <- gene_info %>% na.omit()
+		save(gene_info, file = paste0(oPfx, ".Rdata"))
+	} else {
+		stop ("Error: invalid gene2info file", call.=FALSE)
+	}
+	if (opt$verbose) {
+		head(gene_info)
+	}
+	
+
+	### STEP2: gene2go
+	print (paste0("### Step2: gene2go"))
+	oPfx=paste0(outPfx, ".gene2go")
+	gene2go <- data.frame(GID = character(), GO = character(), EVIDENCE = character())
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+		gene2go<-unique(gene2go)
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene2go<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "GO", "EVIDENCE"))
+		gene2go<-unique(gene2go)
+		save(gene2go, file = paste0(oPfx, ".Rdata"))
+	} else {
+		stop ("Error: invalid gene2go file", call.=FALSE)
+	}
+	if (opt$verbose) {
+		head(gene2go)
+	}
+
+	### STEP3: gene2ko
+	print (paste0("### Step3: gene2ko"))
+	oPfx=paste0(outPfx, ".gene2ko")
+	gene2ko <- data.frame(GID = character(), KO = character())
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+		gene2ko<-unique(gene2ko)
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene2ko<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "KO"))
+		gene2ko<-unique(gene2ko)
+		save(gene2ko, file = paste0(oPfx, ".Rdata"))
+	} else {
+		stop ("Error: invalid gene2ko file", call.=FALSE)
+	}
+	if (opt$verbose) {
+		head(gene2ko)
+	}
+
+	### STEP4: gene2pathway
+	print (paste0("### Step4: gene2pathway"))
+	gene2pathway <- data.frame(GID = character(), Pathway = character())
+	oPfx=paste0(outPfx, ".gene2pathway")
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene2pathway<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "Pathway"))
+		gene2pathway<-unique(gene2pathway)
+		save(gene2pathway, file = paste0(oPfx, ".Rdata"))
+	} else {
+		stop ("Error: invalid gene2pathway file", call.=FALSE)
+	}
+	if (opt$verbose) {
+		head(gene2pathway)
+	}
+
+	### STEP5: make Orgdb
+#	library(AnnotationForge,quietly = TRUE)
+#	library(RSQLite,quietly = TRUE)
+#	library(DBI,quietly = TRUE)
+	print (paste0("### Step5: makeOrgDB"))
+	my_orgdb <- str_c("org.", str_to_upper(str_sub(genus, 1, 1)) , species, ".eg.db", sep = "")
+	if (file_test("-d", paste(out_dir,"/",my_orgdb))) {
+		unlink(paste(out_dir,"/",my_orgdb) , recursive = TRUE, force = TRUE)
+	}
+	makeOrgPackage(gene_info=gene_info,
+		       go=gene2go,
+		       ko=gene2ko,
+		       pathway=gene2pathway,
+		       maintainer = "Fu-Hao_Lu<lufuhao@henu.edu.cn>",
+		       author = "Fu-Hao_Lu",
+		       version=version,
+		       outputDir = out_dir,
+		       tax_id=tax_id,
+		       genus=genus,
+		       species=species,
+		       goTable="go")
+	
+	return(my_orgdb)
+}
+
+my_orgdb <- makeOrgPackageFromEmapper(opt$prefix,
+                                      orgDbVersion,
+                                      tax_id = orgDbTaxid,
+                                      genus = orgDbGenus,
+                                      species = orgDbSpecies)
+
+if (requireNamespace(my_orgdb, quietly = TRUE)) {
+	remove.packages(my_orgdb)
+}
+install.packages(paste0(out_dir,"/", my_orgdb), repos = NULL, type="source")
+
+print (paste0("OrgDB: ", my_orgdb))
+#library(org.Taestivum.eg.db)
+#columns(org.Taestivum.eg.db)
+if (F) {### for test
+	keytypes(org.Taestivum.eg.db)
+	columns(org.Taestivum.eg.db)
+#	keys(org.Taestivum.eg.db, keytype="PATH") %>% head()
+#	keys(org.Taestivum.eg.db, keytype="SYMBOL") %>% head()
+	test_geneID="TraesCS1A02G002400.1"
+	gene_info[which(gene_info$GID==test_geneID),]
+	gene2go[which(gene2go$GID==test_geneID),]
+	gene2ko[which(gene2ko$GID==test_geneID),]
+	gene2pathway[which(gene2pathway$GID==test_geneID),]
+	AnnotationDbi::select(org.Taestivum.eg.db, keys = c(test_geneID), columns = c("GENENAME", "GID", "GO", "KO","Pathway"))
+	AnnotationDbi::select(org.Taestivum.eg.db, keys = c(test_geneID), columns = c("GID", "GO", "KO","Pathway")) %>%
+	                      dplyr::select(Pathway, GID)
+	                      na.omit()
+	gene2pathway2 <- gene2ko %>% left_join(ko2pathway, by = "KO") %>% dplyr::select(GID, Pathway) %>% na.omit()
+	pathway2gene[which(pathway2gene$GID==test_geneID),]
+}
