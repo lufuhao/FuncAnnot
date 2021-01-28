@@ -114,14 +114,16 @@ my %gene2pathway=();
 @gofiles=split(/,/,join(',',@gofiles));
 @kofiles=split(/,/,join(',',@kofiles));
 my $ko2pathway={};
-if (scalar(@kofiles)>0) {
-	if ($kegg_json ne "" and -s $kegg_json) {
-		$ko2pathway=KeggJosnLoad($kegg_json);
-	}
-	else {
+my $pathway2name={};
+my $ko2name={};
+if (scalar(@kofiles)>0) {### KO files need KEGG json file
+	unless ($kegg_json ne "" and -s $kegg_json) {
 		print STDERR "Error: please provide a KEGG json file to convert KO to pathway\n";
 		exit 100;
 	}
+}
+if ($kegg_json ne "" and -s $kegg_json) {
+	($ko2pathway, $pathway2name, $ko2name)=KeggJosnLoad($kegg_json);
 }
 
 
@@ -168,6 +170,11 @@ foreach my $x (@eggnogfiles) {
 			if ($i=~/^ko:/i) {
 				$i=~s/^ko://i;
 				$gene2ko{$arr[0]}{$i}++;
+			}
+			if (exists ${$ko2pathway}{$i}) {
+				foreach my $ptw (keys %{${$ko2pathway}{$i}}) {
+					$gene2pathway{$arr[0]}{$ptw}++;
+				}
 			}
 		}
 		@kos=();
@@ -270,10 +277,19 @@ foreach my $z (@kofiles) {
 
 ### write gene2info
 my $file_gene2info="$prefix.gene_info.tab";
+unlink ("$prefix.gene_info.Rdata") if (-e "$prefix.gene_info.Rdata");
 my $file_gene2go="$prefix.gene2go.tab";
+unlink ("$prefix.gene2go.Rdata") if (-e "$prefix.gene2go.Rdata");
 my $file_gene2ko="$prefix.gene2ko.tab";
+unlink ("$prefix.gene2ko.Rdata") if (-e "$prefix.gene2ko.Rdata");
 my $file_gene2pathway="$prefix.gene2pathway.tab";
+unlink ("$prefix.gene2pathway.Rdata") if (-e "$prefix.gene2pathway.Rdata");
+my $file_pathway2name="$prefix.pathway2name.tab";
+unlink ("$prefix.pathway2name.Rdata") if (-e "$prefix.pathway2name.Rdata");
+my $file_ko2name="$prefix.ko2name.tab";
+unlink ("$prefix.ko2name.Rdata") if (-e "$prefix.ko2name.Rdata");
 open (INFO, " > ", $file_gene2info) || die "Error: can not write to geneinfo: $file_gene2info\n";
+print INFO "GID\tGENENAME\n";
 foreach my $a (sort keys(%gene2info)) {
 	my $b=""; my $max=0;
 	foreach my $c (sort keys(%{$gene2info{$a}})) {
@@ -288,14 +304,15 @@ foreach my $a (sort keys(%gene2info)) {
 }
 close INFO;
 open (GO, " > ", $file_gene2go) || die "Error: can not write to gene2go: $file_gene2go\n";
+print GO "GID\tGO\tEVIDENCE\n";
 foreach my $a (sort keys(%gene2go)) {
 	foreach my $c (sort keys(%{$gene2go{$a}})) {
 		print GO $a, "\t", $c, "\tIEA\n";
 	}
-	
 }
 close GO;
 open (KO, " > ", $file_gene2ko) || die "Error: can not write to gene2ko: $file_gene2ko\n";
+print KO "GID\tKO\n";
 foreach my $a (sort keys(%gene2ko)) {
 	foreach my $c (sort keys(%{$gene2ko{$a}})) {
 		print KO $a, "\t", $c, "\n";
@@ -303,13 +320,29 @@ foreach my $a (sort keys(%gene2ko)) {
 }
 close KO;
 open (PATHWAY, " > ", $file_gene2pathway) || die "Error: can not write to file_gene2pathway: $file_gene2pathway\n";
-foreach my $a (sort keys(%gene2ko)) {
-	foreach my $c (sort keys(%{$gene2ko{$a}})) {
+print PATHWAY "GID\tPathway\n";
+foreach my $a (sort keys(%gene2pathway)) {
+	foreach my $c (sort keys(%{$gene2pathway{$a}})) {
 		print PATHWAY $a, "\t", $c, "\n";
 	}
 }
 close PATHWAY;
-
+if ($kegg_json ne "" and -s $kegg_json) {
+	open (PATH2NAME, " > ", $file_pathway2name) || die "Error: can not write to file_pathway2name: $file_pathway2name\n";
+	print PATH2NAME "Pathway\tName\n";
+	foreach my $a (sort keys(%{$pathway2name})) {
+		my $c=${$pathway2name}{$a};
+		print PATH2NAME $a, "\t", $c, "\n";
+	}
+	close PATH2NAME;
+	open (KO2NAME, " > ", $file_ko2name) || die "Error: can not write to file_ko2name: $file_ko2name\n";
+	print KO2NAME "KO\tName\n";
+	foreach my $a (sort keys(%{$ko2name})) {
+		my $c=${$ko2name}{$a};
+		print KO2NAME $a, "\t", $c, "\n";
+	}
+	close KO2NAME;
+}
 
 #####################################################################
 ###                         sub functions                         ###
