@@ -278,18 +278,24 @@ foreach my $z (@kofiles) {
 ### write gene2info
 my $file_gene2info="$prefix.gene_info.tab";
 unlink ("$prefix.gene_info.Rdata") if (-e "$prefix.gene_info.Rdata");
+unlink ($file_gene2info) if (-e $file_gene2info);
 my $file_gene2go="$prefix.gene2go.tab";
 unlink ("$prefix.gene2go.Rdata") if (-e "$prefix.gene2go.Rdata");
+unlink ($file_gene2go) if (-e $file_gene2go);
 my $file_gene2ko="$prefix.gene2ko.tab";
 unlink ("$prefix.gene2ko.Rdata") if (-e "$prefix.gene2ko.Rdata");
+unlink ($file_gene2ko) if (-e $file_gene2ko);
 my $file_gene2pathway="$prefix.gene2pathway.tab";
 unlink ("$prefix.gene2pathway.Rdata") if (-e "$prefix.gene2pathway.Rdata");
+unlink ($file_gene2pathway) if (-e $file_gene2pathway);
 my $file_pathway2name="$prefix.pathway2name.tab";
 unlink ("$prefix.pathway2name.Rdata") if (-e "$prefix.pathway2name.Rdata");
+unlink ($file_pathway2name) if (-e $file_pathway2name);
 my $file_ko2name="$prefix.ko2name.tab";
 unlink ("$prefix.ko2name.Rdata") if (-e "$prefix.ko2name.Rdata");
+unlink ($file_ko2name) if (-e $file_ko2name);
 open (INFO, " > ", $file_gene2info) || die "Error: can not write to geneinfo: $file_gene2info\n";
-print INFO "GID\tGENENAME\n";
+print INFO "GID\tSYMBOL\tGENENAME\n";
 foreach my $a (sort keys(%gene2info)) {
 	my $b=""; my $max=0;
 	foreach my $c (sort keys(%{$gene2info{$a}})) {
@@ -300,7 +306,7 @@ foreach my $a (sort keys(%gene2info)) {
 			$b=$c; $max=$gene2info{$a}{$c};
 		}
 	}
-	print INFO $a, "\t", $b, "\n";
+	print INFO $a, "\t", $a, "\t", $b, "\n";
 }
 close INFO;
 open (GO, " > ", $file_gene2go) || die "Error: can not write to gene2go: $file_gene2go\n";
