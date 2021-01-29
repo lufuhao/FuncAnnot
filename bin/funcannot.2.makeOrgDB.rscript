@@ -56,7 +56,10 @@ if (is.null(opt$prefix)){
 
 print (paste0("Output Dir: ", opt$outdir))
 print (paste0("Output prefix: ", opt$prefix))
-
+print (paste0("Output genus: ", opt$genus))
+print (paste0("Output species: ", opt$species))
+print (paste0("Output taxid: ", opt$taxid))
+print (paste0("Output vers: ", opt$vers))
 
 
 out_dir=opt$outdir
@@ -64,7 +67,7 @@ orgDbVersion=opt$vers
 orgDbTaxid=opt$taxid
 orgDbGenus = opt$genus
 orgDbSpecies = opt$species
-
+mode_verbose=opt$verbose
 
 ### Input output
 if (! file_test("-d", out_dir)) {
@@ -81,19 +84,21 @@ makeOrgPackageFromEmapper <- function(outPfx,
 	### STEP1: gene_info
 	print (paste0("### Step1: gene_info"))
 	oPfx=paste0(outPfx, ".gene_info")
-	gene_info<-data.frame(GID = character(), GENENAME = character())
+	gene_info<-data.frame(GID = character(), SYMBOL = character(), GENENAME = character())
 	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
 		print (paste0("    Loading:", oPfx, ".Rdata"))
 		load(paste0(oPfx, ".Rdata"))
+		colnames(gene_info)=c("GID", "SYMBOL", "GENENAME")
 	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
 		print (paste0("    Loading:", oPfx, ".tab"))
-		gene_info<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "GENENAME"))
+		gene_info<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, header=TRUE)
+		colnames(gene_info)=c("GID", "SYMBOL", "GENENAME")
 		gene_info <- gene_info %>% na.omit()
 		save(gene_info, file = paste0(oPfx, ".Rdata"))
 	} else {
-		stop ("Error: invalid gene2info file", call.=FALSE)
+		stop ("Error: invalid gene_info file", call.=FALSE)
 	}
-	if (opt$verbose) {
+	if (mode_verbose) {
 		head(gene_info)
 	}
 	
@@ -105,16 +110,18 @@ makeOrgPackageFromEmapper <- function(outPfx,
 	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
 		print (paste0("    Loading:", oPfx, ".Rdata"))
 		load(paste0(oPfx, ".Rdata"))
+		colnames(gene2go)=c("GID", "GO", "EVIDENCE")
 		gene2go<-unique(gene2go)
 	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
 		print (paste0("    Loading:", oPfx, ".tab"))
-		gene2go<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "GO", "EVIDENCE"))
+		gene2go<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, header=TRUE)
+		colnames(gene2go)=c("GID", "GO", "EVIDENCE")
 		gene2go<-unique(gene2go)
 		save(gene2go, file = paste0(oPfx, ".Rdata"))
 	} else {
 		stop ("Error: invalid gene2go file", call.=FALSE)
 	}
-	if (opt$verbose) {
+	if (mode_verbose) {
 		head(gene2go)
 	}
 
@@ -126,15 +133,17 @@ makeOrgPackageFromEmapper <- function(outPfx,
 		print (paste0("    Loading:", oPfx, ".Rdata"))
 		load(paste0(oPfx, ".Rdata"))
 		gene2ko<-unique(gene2ko)
+		colnames(gene2ko)=c("GID", "KO")
 	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
 		print (paste0("    Loading:", oPfx, ".tab"))
-		gene2ko<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "KO"))
+		gene2ko<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, header=TRUE)
 		gene2ko<-unique(gene2ko)
+		colnames(gene2ko)=c("GID", "KO")
 		save(gene2ko, file = paste0(oPfx, ".Rdata"))
 	} else {
 		stop ("Error: invalid gene2ko file", call.=FALSE)
 	}
-	if (opt$verbose) {
+	if (mode_verbose) {
 		head(gene2ko)
 	}
 
@@ -145,15 +154,18 @@ makeOrgPackageFromEmapper <- function(outPfx,
 	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
 		print (paste0("    Loading:", oPfx, ".Rdata"))
 		load(paste0(oPfx, ".Rdata"))
+		gene2pathway<-unique(gene2pathway)
+		colnames(gene2pathway)=c("GID", "Pathway")
 	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
 		print (paste0("    Loading:", oPfx, ".tab"))
-		gene2pathway<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=c("GID", "Pathway"))
+		gene2pathway<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, header=TRUE)
 		gene2pathway<-unique(gene2pathway)
+		colnames(gene2pathway)=c("GID", "Pathway")
 		save(gene2pathway, file = paste0(oPfx, ".Rdata"))
 	} else {
 		stop ("Error: invalid gene2pathway file", call.=FALSE)
 	}
-	if (opt$verbose) {
+	if (mode_verbose) {
 		head(gene2pathway)
 	}
 
@@ -163,15 +175,15 @@ makeOrgPackageFromEmapper <- function(outPfx,
 #	library(DBI,quietly = TRUE)
 	print (paste0("### Step5: makeOrgDB"))
 	my_orgdb <- str_c("org.", str_to_upper(str_sub(genus, 1, 1)) , species, ".eg.db", sep = "")
-	if (file_test("-d", paste(out_dir,"/",my_orgdb))) {
-		unlink(paste(out_dir,"/",my_orgdb) , recursive = TRUE, force = TRUE)
+	if (file_test("-d", paste0(out_dir, "/", my_orgdb))) {
+		unlink(paste0(out_dir, "/", my_orgdb) , recursive = TRUE, force = TRUE)
 	}
 	makeOrgPackage(gene_info=gene_info,
 		       go=gene2go,
 		       ko=gene2ko,
 		       pathway=gene2pathway,
-		       maintainer = "Fu-Hao_Lu<lufuhao@henu.edu.cn>",
-		       author = "Fu-Hao_Lu",
+		       maintainer = "Fu-Hao Lu <lufuhao@henu.edu.cn>",
+		       author = "Fu-Hao_Lu <lufuhao@henu.edu.cn>",
 		       version=version,
 		       outputDir = out_dir,
 		       tax_id=tax_id,
@@ -189,19 +201,30 @@ my_orgdb <- makeOrgPackageFromEmapper(opt$prefix,
                                       species = orgDbSpecies)
 
 if (requireNamespace(my_orgdb, quietly = TRUE)) {
+	print (paste0("### Step6: Removing OLD R packages", my_orgdb))
 	remove.packages(my_orgdb)
 }
+print (paste0("### Step7: install new R packages", my_orgdb))
 install.packages(paste0(out_dir,"/", my_orgdb), repos = NULL, type="source")
 
 print (paste0("OrgDB: ", my_orgdb))
+if (mode_verbose) {
+	print (paste0("### Info: OrgDB successfully installed: ", my_orgdb))
+}
+
+
+
+
 #library(org.Taestivum.eg.db)
 #columns(org.Taestivum.eg.db)
+#keytypes(org.Taestivum.eg.db)
 if (F) {### for test
 	keytypes(org.Taestivum.eg.db)
 	columns(org.Taestivum.eg.db)
 #	keys(org.Taestivum.eg.db, keytype="PATH") %>% head()
 #	keys(org.Taestivum.eg.db, keytype="SYMBOL") %>% head()
-	test_geneID="TraesCS1A02G002400.1"
+	test_geneID="TraesCS1A02G002400"
+	test_geneID="TraesCS1A02G001800"
 	gene_info[which(gene_info$GID==test_geneID),]
 	gene2go[which(gene2go$GID==test_geneID),]
 	gene2ko[which(gene2ko$GID==test_geneID),]
