@@ -15,16 +15,19 @@ It can collect data from Eggnog-mapper of custom BLAST. But you may need to tran
 
 ## Requirements
 
-  Perl modules:
+  **Perl modules**:
+
     JSON, Getopt::Long, [FuhaoPerl5Lib](https://github.com/lufuhao/FuhaoPerl5Lib)
-  
-  R packages: 
-    optparse, dplyr, stringr, 
-    AnnotationForge, ClusterProfiler, DBI, GO.db, RSQLite
 
-  Python
+  **R packages**: 
 
+    optparse, dplyr, stringr, purrr, tidyverse
 
+    AnnotationForge, ClusterProfiler, DBI, GO.db, RSQLite, enrichplot
+
+  **Python**
+
+    gzip, getopt, sys
 
 
 
@@ -114,6 +117,9 @@ funcannot.1.data.pl \
  --gos 0.diamond/gene_go/LC03.gene2go \
  --gos 0.diamond/gene_go/stringtie.new.gene2go \
  --ignorego 0 --rmgotsnum -p MyDB
+ --keggjson ko00001.json
+
+head -n 3 *.tab
 ```
 
 
@@ -135,10 +141,9 @@ funcannot.2.makeOrgDB.rscript --prefix MyOut --genus Triticum --species aestivum
 
 ### 4. Given a gene list, do the enrichment of GO/KO using clusterProfiler
 
-- [ ] to be done
 
 ```
-not availble now
+funcannot.3.annot.rscript --file "DEG.list" --prefix MyOut --lib "org.Taestivum.eg.db" --width 17 --height 17 --resolution 600 --pointsize 10 --family "ArialMT" 
 ```
 
 
