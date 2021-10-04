@@ -1,0 +1,374 @@
+#!/usr/bin/Rscript
+
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+packages.required <- c("optparse", "clusterProfiler", "enrichplot", "AnnotationDbi")
+#"purrr", "tidyverse", 
+
+if (!requireNamespace("BiocManager", quietly = T))
+        install.packages("BiocManager")
+invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
+packages.absense <- setdiff(packages.required, rownames(installed.packages()))
+if (length(packages.absense) > 0) {
+	install.packages(packages.absense)
+}
+invisible(lapply(packages.required, function(x) require(x, character.only = T, quietly = T, warn.conflicts = FALSE)))
+
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", help="Gene list file, 1 column only [default= %default]", metavar="File"),
+    make_option(c("-b", "--background"), type="character", default=NULL, 
+              action = "store", help="Background gene list file, 1 column only [default= %default]", metavar="File"),
+    make_option(c("-p", "--prefix"), type="character", default="MyOut", 
+              action = "store", help="Output file prefix [default= %default]", metavar="PREFIX"),
+#    make_option(c("--eps"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output EPS [default= %default]", metavar=NULL),
+#    make_option(c("--svg"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output SVG [default= %default]", metavar=NULL),
+#    make_option(c("--tif"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+#    make_option(c("--pdf"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+    make_option(c("--lib"), type="character", default=NULL, 
+              action = "store", help="OrgDB library name [default= %default]", metavar="STR"),
+    make_option(c("--category"), type="double", default=20, 
+              action = "store", help="Category No [default= %default]", metavar="float"),
+    make_option(c("--mingss"), type="double", default=10, 
+              action = "store", help="minGSSize minimal size of genes annotated for testing [default= %default]", metavar="float"),
+    make_option(c("--maxgss"), type="double", default=10, 
+              action = "store", help="maxGSSize maximal size of genes annotated for testing [default= %default]", metavar="float"),
+    make_option(c("--width"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF width (cm) [default= %default]", metavar="float"),
+    make_option(c("--height"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF height (cm) [default= %default]", metavar="float"),
+    make_option(c("--resolution"), type="double", default=600, 
+              action = "store", help="Output TIFF resolution [default= %default]", metavar="float"),
+    make_option(c("--pointsize"), type="double", default=10, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF [default= %default]", metavar="float"),
+    make_option(c("--family"), type="character", default="ArialMT", 
+              action = "store", help="Output TIFF/SVG/EPS/PDF font family [default= %default]", metavar="STR"),
+    make_option(c("--verbose"), type="logical", default=FALSE, 
+              action = "store_true", help="Print detailed info [default= %default]", metavar=NULL)
+);
+
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to enrich GO/KOs!")
+opt = parse_args(opt_parser)
+
+if (is.null(opt$file)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+
+
+
+################# input and output #########################
+geneList=opt$file
+geneBkg=opt$background
+outPfx=opt$prefix
+libname=opt$lib
+numCateg=opt$category
+minGssize=opt$mingss
+maxGssize=opt$maxgss
+
+print (paste0("Gene   File: ", geneList))
+print (paste0("Bkg    File: ", geneBkg))
+print (paste0("Out prefix : ", outPfx))
+print (paste0("OrgDB      : ", libname))
+
+################################################
+#library(purrr)
+#library(tidyverse)
+#library(clusterProfiler)
+#library(enrichplot)
+#library(org.Taestivum.eg.db)
+#keytypes(org.Taestivum.eg.db)
+#columns(org.Taestivum.eg.db)
+
+library(libname, character.only = T)
+keytypes(org.Taestivum.eg.db)
+columns(org.Taestivum.eg.db)
+
+#########################################################################################
+print (paste0("### Step1: Reading interesting gene list: ", geneList))
+gene2list=read.table(geneList, sep="\t", quote="", row.names=NULL, header=FALSE)
+colnames(gene2list)=c("GID")
+head(gene2list)
+cat ("\n\n\n")
+
+print (paste0("### Step1: Reading background gene list: ", geneBkg))
+gene2bkg=read.table(geneBkg, sep="\t", quote="", row.names=NULL, header=FALSE)
+colnames(gene2bkg)=c("GID")
+head(gene2bkg)
+cat ("\n\n\n")
+
+###ID conversion
+#go_ythdf2_id_trance <- bitr(go_ythdf2,fromType = "SYMBOL",toType = "ENTREZID", OrgDb = "org.Hs.eg.db",drop = T)
+
+
+
+################################################
+### pathway2name
+print ("### Step2: Loading pathway2name")
+pathway2name <- data.frame(Pathway = character(), Name = character())
+oPfx=paste0(outPfx, ".pathway2name")
+if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+	print (paste0("    Loading:", oPfx, ".Rdata"))
+	load(paste0(oPfx, ".Rdata"))
+	pathway2name<-unique(pathway2name)
+	colnames(pathway2name)=c("Pathway", "Name")
+} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+	print (paste0("    Loading:", oPfx, ".tab"))
+	pathway2name<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, header=TRUE)
+	pathway2name<-unique(pathway2name)
+	colnames(pathway2name)=c("Pathway", "Name")
+	save(pathway2name, file = paste0(oPfx, ".Rdata"))
+} else {
+	stop ("Error: invalid pathway2name file", call.=FALSE)
+}
+head(pathway2name)
+cat ("\n\n\n")
+
+#AnnotationDbi::select(org.Taestivum.eg.db, keys = c("TraesCS1A02G001800.1"), columns = c("EVIDENCE", "EVIDENCEALL", "GENENAME", "GID", "GO", "GOALL", "KO", "ONTOLOGY", "ONTOLOGYALL", "Pathway")) ### for Test
+print (paste0("### Step3: pathway2gene from OrgDB: org.Taestivum.eg.db"))
+pathway2gene <- AnnotationDbi::select(org.Taestivum.eg.db, 
+                                      keys = keys(org.Taestivum.eg.db), 
+                                      columns = c("Pathway", "GID")) %>%
+                dplyr::select(Pathway, GID) %>%
+                na.omit()
+head(pathway2gene)
+cat ("\n\n\n")
+
+
+################################################
+#KEGG pathway
+#write.table(pathway2gene,file = paste0(outPfx, ".pathway2gene.tab"), sep="\t", quote=F, row.names=F, col.names=T)
+#save(pathway2gene, file = paste0(outPfx, ".pathway2gene.Rdata"))
+#gene2ko <- read.table(paste0(outPfx, ".gene2ko.tab"), sep = "\t", , header=T)
+
+ekp <- enricher(gene2list$GID,
+                universe=gene2bkg$GID,
+                TERM2GENE = pathway2gene,
+                TERM2NAME = pathway2name,
+                pvalueCutoff = 0.05, 
+                qvalueCutoff = 0.05,
+                pAdjustMethod = "BH",
+                minGSSize=minGssize, maxGSSize=maxGssize)
+#
+#
+#ekp_results <- as.data.frame(ekp)
+oPfx=paste0(outPfx, ".KO")
+write.table(ekp, paste0(outPfx, ".KEGG.tab"),quote = F ,sep = "\t")
+pdf(file=paste0(oPfx, ".barplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+barplot(ekp, showCategory=numCateg, color="pvalue", font.size=10)
+dev.off()
+Sys.sleep(10)
+
+pdf(file=paste0(oPfx, ".dotplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+dotplot(ekp, showCategory=numCateg, orderBy="pvalue")
+dev.off()
+Sys.sleep(10)
+
+#ekp_sim<-pairwise_termsim(ekp)
+#pdf(file=paste0(oPfx, ".emapplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+#emapplot(ekp_sim)
+#dev.off()
+#Sys.sleep(10)
+
+#pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(oPfx, ".cnetplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+cnetplot(ekp, showCategory = numCateg, node_label='category')
+dev.off()
+Sys.sleep(10)
+
+### GO Enrichment
+#ont: CC BP MF
+if (F) {
+for (indOnt in c("CC", "BP", "MF"))
+{
+	print (paste("Gene Ontology: ", indOnt))
+	ego <- enrichGO(gene = gene2list$GID, keyType = "GID", OrgDb = org.Taestivum.eg.db, ont = indOnt, pvalueCutoff = 0.05, qvalueCutoff = 0.05, readable = TRUE)
+
+	print (paste("Gene Ontology: ", indOnt, ": Writing to Table"))
+	#readable=T display gene name
+	dim(ego)
+	goPfx=paste0(outPfx, ".GO.", indOnt)
+	write.table(as.data.frame(ego), file = paste0(goPfx, ".tab"), quote = F)
+	Sys.sleep(2)
+
+	print (paste("Gene Ontology: ", indOnt, ": plot barplot"))
+	#pdf(file=paste0(goPfx, ".barplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	#pdf(file=paste0(goPfx, ".barplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	tiff(filename = paste0(goPfx, ".barplot.tif"), width=opt$width, height=opt$height, units = "cm", pointsize=opt$pointsize, compression = "lzw", bg = "white", res=opt$resolution, family=opt$family)
+	print(barplot(ego, showCategory=numCateg, x = "GeneRatio"))
+	dev.off()
+	Sys.sleep(2)
+
+	print (paste("Gene Ontology: ", indOnt, ": plot dotplot"))
+	#pdf(file=paste0(goPfx, ".dotplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	pdf(file=paste0(goPfx, ".dotplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	#pdf(file=paste0(goPfx, ".dotplot.pdf"))
+	print(dotplot(ego, showCategory=numCateg, orderBy="pvalue"))
+	dev.off()
+	Sys.sleep(2)
+
+	print (paste("Gene Ontology: ", indOnt, ": plot emapplot"))
+	#pdf(file=paste0(goPfx, ".emapplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	pdf(file=paste0(goPfx, ".emapplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	#pdf(file=paste0(goPfx, ".emapplot.pdf"))
+	ego_sim<-pairwise_termsim(ego)
+	print(emapplot(ego_sim))
+	dev.off()
+	Sys.sleep(2)
+
+	print (paste("Gene Ontology: ", indOnt, ": plot cnetplot"))
+	#pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family)
+	#pdf(file=paste0(goPfx, ".cnetplot.pdf"))
+	print(cnetplot(ego, showCategory = numCateg))
+	dev.off()
+	Sys.sleep(2)
+}
+}
+
+indOnt="CC"
+print (paste("Gene Ontology: ", indOnt))
+ego <- enrichGO(gene = gene2list$GID, universe=gene2bkg$GID, keyType = "GID", OrgDb = org.Taestivum.eg.db, ont = indOnt, minGSSize=minGssize, maxGSSize=maxGssize, pvalueCutoff = 0.05, qvalueCutoff = 0.05, readable = TRUE)
+ego <- simplify(ego, cutoff=0.7,by="p.adjust",select_fun=min) 
+Sys.sleep(10)
+
+
+print (paste("Gene Ontology: ", indOnt, ": Writing to Table"))
+dim(ego)
+goPfx=paste0(outPfx, ".GO.", indOnt)
+write.table(as.data.frame(ego), file = paste0(goPfx, ".tab"), quote = F)
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot barplot"))
+#pdf(file=paste0(goPfx, ".barplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".barplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+barplot(ego, showCategory=numCateg, x = "GeneRatio")
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot dotplot"))
+#pdf(file=paste0(goPfx, ".dotplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".dotplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+dotplot(ego, showCategory=numCateg, orderBy="pvalue")
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot emapplot"))
+#pdf(file=paste0(goPfx, ".emapplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".emapplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+ego_sim<-pairwise_termsim(ego)
+emapplot(ego_sim)
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot cnetplot"))
+#pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family)
+cnetplot(ego, showCategory = numCateg, node_label='category')
+dev.off()
+Sys.sleep(10)
+
+
+
+indOnt="BP"
+print (paste("Gene Ontology: ", indOnt))
+ego <- enrichGO(gene = gene2list$GID, universe=gene2bkg$GID, keyType = "GID", OrgDb = org.Taestivum.eg.db, ont = indOnt, minGSSize=minGssize, maxGSSize=maxGssize, pvalueCutoff = 0.05, qvalueCutoff = 0.05, readable = TRUE)
+ego <- simplify(ego, cutoff=0.7,by="p.adjust",select_fun=min) 
+
+print (paste("Gene Ontology: ", indOnt, ": Writing to Table"))
+dim(ego)
+goPfx=paste0(outPfx, ".GO.", indOnt)
+write.table(as.data.frame(ego), file = paste0(goPfx, ".tab"), quote = F)
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot barplot"))
+#pdf(file=paste0(goPfx, ".barplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".barplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+barplot(ego, showCategory=numCateg, x = "GeneRatio")
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot dotplot"))
+#pdf(file=paste0(goPfx, ".dotplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".dotplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+dotplot(ego, showCategory=numCateg, orderBy="pvalue")
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot emapplot"))
+#pdf(file=paste0(goPfx, ".emapplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".emapplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+ego_sim<-pairwise_termsim(ego)
+emapplot(ego_sim)
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot cnetplot"))
+#pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family)
+cnetplot(ego, showCategory = numCateg, node_label='category')
+dev.off()
+Sys.sleep(10)
+
+
+
+indOnt="MF"
+print (paste("Gene Ontology: ", indOnt))
+ego <- enrichGO(gene = gene2list$GID, universe=gene2bkg$GID, keyType = "GID", OrgDb = org.Taestivum.eg.db, ont = indOnt, minGSSize=minGssize, maxGSSize=maxGssize, pvalueCutoff = 0.05, qvalueCutoff = 0.05, readable = TRUE)
+ego <- simplify(ego, cutoff=0.7,by="p.adjust",select_fun=min) 
+
+print (paste("Gene Ontology: ", indOnt, ": Writing to Table"))
+dim(ego)
+goPfx=paste0(outPfx, ".GO.", indOnt)
+write.table(as.data.frame(ego), file = paste0(goPfx, ".tab"), quote = F)
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot barplot"))
+#pdf(file=paste0(goPfx, ".barplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".barplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+barplot(ego, showCategory=numCateg, x = "GeneRatio")
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot dotplot"))
+#pdf(file=paste0(goPfx, ".dotplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".dotplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+dotplot(ego, showCategory=numCateg, orderBy="pvalue")
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot emapplot"))
+#pdf(file=paste0(goPfx, ".emapplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".emapplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+ego_sim<-pairwise_termsim(ego)
+emapplot(ego_sim)
+dev.off()
+Sys.sleep(10)
+
+print (paste("Gene Ontology: ", indOnt, ": plot cnetplot"))
+#pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+pdf(file=paste0(goPfx, ".cnetplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family)
+cnetplot(ego, showCategory = numCateg, node_label='category')
+dev.off()
+Sys.sleep(10)
+

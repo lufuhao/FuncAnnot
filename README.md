@@ -136,7 +136,7 @@ Do some research before running
 ```
 cd $runningdir
 
-funcannot.2.makeOrgDB.rscript --prefix MyOut --genus Triticum --species aestivum --taxid 4565 --vers 2021.0128
+funcannot.2.makeOrgDB.rscript --prefix MyDB --genus Triticum --species aestivum --taxid 4565 --vers 2021.0128
 ```
 
 ### 4. Given a gene list, do the enrichment of GO/KO using clusterProfiler
