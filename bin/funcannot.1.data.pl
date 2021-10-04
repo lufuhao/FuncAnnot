@@ -26,7 +26,7 @@ Options:
     --input|-i    <Files> Eggnog output files ending with ".annotations"
                           Could be a list separated by comma or
                           specify multiple times or both
-    --ignoreegg   <INT>   Ignore first INT comment lines, default:4
+    --ignoreegg   <INT>   Ignore first INT comment lines, default:5
                           Will inore lines starting with '# ' or '#query_name'
     --rmeggtsnum          Trim transcript number ending with .\\d+\$
   
@@ -71,7 +71,7 @@ die USAGE unless @ARGV;
 ###Receving parameter################################################
 my ($help, $verbose, $debug, $version);
 my ($input, $output);
-my ($num_ignored_line1, $num_ignored_line2, $num_ignored_line3)=(4, 0, 0);
+my ($num_ignored_line1, $num_ignored_line2, $num_ignored_line3)=(5, 0, 0);
 my ($transcript_num1, $transcript_num2, $transcript_num3)= (0,0,0);
 my $prefix="MyOut";
 my @eggnogfiles=();
@@ -106,9 +106,16 @@ my %gene2info=();
 my %gene2go=();
 my %gene2ko=();
 my %gene2pathway=();
-
-
-
+### emapper v1
+#query_name	seed_eggNOG_ortholog	seed_ortholog_evalue	seed_ortholog_score	best_tax_level	Proferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction
+#my $col_go_emapper=6;
+#my $col_ko_emapper=8;
+#my $col_pt_emapper=9;
+### emapper v2
+#query	seed_ortholog	evalue	score	eggNOG_OGs	max_annot_lvl	COG_category	Description	Preferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction	PFAMs
+my $col_go_emapper=9;
+my $col_ko_emapper=11;
+my $col_pt_emapper=12;
 ### input and output ################################################
 @eggnogfiles=split(/,/,join(',',@eggnogfiles));
 @gofiles=split(/,/,join(',',@gofiles));
@@ -140,8 +147,8 @@ foreach my $x (@eggnogfiles) {
 		next if ($line=~/^#\s+/ or $line=~/^#query_name/);
 		my @arr=();
 		@arr=split(/\t/, $line);
-		unless (scalar(@arr)==22) {
-			print STDERR "Warnings: colnum !=22: $line in file $x, ignored\n";
+		unless (scalar(@arr)==21) {
+			print STDERR "Warnings: colnum !=21: $line in file $x, ignored\n";
 			next;
 		}
 		if ($transcript_num1) {
@@ -153,7 +160,7 @@ foreach my $x (@eggnogfiles) {
 		}
 		#%gene2go
 		my @gos=();
-		@gos=split(/,/, $arr[6]);
+		@gos=split(/,/, $arr[$col_go_emapper]);
 		foreach my $i (@gos) {
 			$i=~s/^\s+//;$i=~s/\s+$//;
 			if ($i=~/^GO:/i) {
@@ -164,7 +171,7 @@ foreach my $x (@eggnogfiles) {
 		@gos=();
 		#%gene2ko
 		my @kos=();
-		@kos=split(/,/, $arr[8]);
+		@kos=split(/,/, $arr[$col_ko_emapper]);
 		foreach my $i (@kos) {
 			$i=~s/^\s+//;$i=~s/\s+$//;
 			if ($i=~/^ko:/i) {
@@ -180,7 +187,7 @@ foreach my $x (@eggnogfiles) {
 		@kos=();
 		#%gene2pathway
 		my @pathway=();
-		@pathway=split(/,/, $arr[9]);
+		@pathway=split(/,/, $arr[$col_pt_emapper]);
 		foreach my $i (@pathway) {
 			$i=~s/^\s+//;$i=~s/\s+$//;
 			if ($i=~/^ko/i) {
