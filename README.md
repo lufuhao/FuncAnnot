@@ -133,10 +133,18 @@ Do some research before running
 * Use the same prefix as Step2, for instance: **MyDB**
 * It takes time to load all the data to DB depending on your data size, so pay patience ...
 
-```
+```bash
 cd $runningdir
 
 funcannot.2.makeOrgDB.rscript --prefix MyDB --genus Triticum --species aestivum --taxid 4565 --vers 2021.0128
+```
+
+```Rscript
+install.packages("org.Taestivum.eg.db", repos = NULL, type = "source")
+library(org.Taestivum.eg.db)
+columns(org.Taestivum.eg.db)
+keys(org.Taestivum.eg.db)
+select(org.Taestivum.eg.db, keys="xxx", columns=c("GO, "Pathway"))
 ```
 
 ### 4. Given a gene list, do the enrichment of GO/KO using clusterProfiler
